@@ -882,7 +882,9 @@ function displayReport(reportData, period) {
 }
 
 // Make functions globally available without crashing if an optional function is missing.
-if (typeof showTab === 'function') window.showTab = showTab;
+if (typeof window.showTab !== 'function') {
+    window.showTab = function () {};
+}
 if (typeof logout === 'function') window.logout = logout;
 if (typeof openOrderModal === 'function') window.openOrderModal = openOrderModal;
 if (typeof closeModal === 'function') window.closeModal = closeModal;
