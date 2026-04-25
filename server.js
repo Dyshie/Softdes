@@ -86,16 +86,18 @@ app.use((req, res) => {
 // Global error handler
 app.use(errorHandler);
 
-// Handle unhandled promise rejections
-process.on('unhandledRejection', (err) => handleUnhandledRejection(err, app));
+if (require.main === module) {
+    // Handle unhandled promise rejections
+    process.on('unhandledRejection', (err) => handleUnhandledRejection(err, app));
 
-// Handle uncaught exceptions
-process.on('uncaughtException', handleUncaughtException);
+    // Handle uncaught exceptions
+    process.on('uncaughtException', handleUncaughtException);
 
-// Start server
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-    console.log(`Server is running on http://localhost:${PORT}`);
-});
+    // Start server
+    const PORT = process.env.PORT || 5000;
+    app.listen(PORT, () => {
+        console.log(`Server is running on http://localhost:${PORT}`);
+    });
+}
 
 module.exports = app;
