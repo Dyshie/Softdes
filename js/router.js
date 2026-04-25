@@ -112,10 +112,13 @@ class Router {
      * Handle hash changes from browser navigation
      */
     handleHashChange() {
-        const hash = window.location.hash.slice(1) || '/login';
-        
+        const rawHash = window.location.hash.slice(1);
+        const normalizedHash = rawHash
+            ? (rawHash.startsWith('/') ? rawHash : `/${rawHash}`)
+            : '/login';
+
         // Parse path and query params
-        const [path, queryString] = hash.split('?');
+        const [path, queryString] = normalizedHash.split('?');
         const params = new URLSearchParams(queryString || '');
         const paramsObj = {};
         params.forEach((value, key) => {
@@ -123,11 +126,11 @@ class Router {
         });
 
         // Check if we're already on this route
-        if (this.currentRoute && this.currentRoute.path === `/${path}`) {
+        const routePath = path === '/' ? (this.isAuthenticated ? '/dashboard' : '/login') : path;
+
+        if (this.currentRoute && this.currentRoute.path === routePath) {
             return;
         }
-
-        const routePath = `/${path}` === '/' ? '/dashboard' : `/${path}`;
         
         if (this.routes.has(routePath)) {
             this.navigate(routePath, paramsObj);
@@ -186,7 +189,13 @@ class Router {
      */
     init() {
         window.addEventListener('hashchange', () => this.handleHashChange());
-        
+
+        // Preserve deep-link routes such as #/login on first load.
+        if (window.location.hash) {
+            this.handleHashChange();
+            return;
+        }
+
         // Handle initial route based on auth state
         const initialRoute = this.isAuthenticated ? '/dashboard' : '/login';
         window.location.hash = initialRoute;

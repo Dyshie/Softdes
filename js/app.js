@@ -871,20 +871,20 @@ function displayReport(reportData, period) {
     container.innerHTML = html;
 }
 
-// Make functions globally available
-window.showTab = showTab;
-window.logout = logout;
-window.openOrderModal = openOrderModal;
-window.closeModal = closeModal;
-window.editOrder = editOrder;
-window.deleteOrder = deleteOrder;
-window.openStaffModal = openStaffModal;
-window.editStaff = editStaff;
-window.deleteStaff = deleteStaff;
-window.suspendStaff = suspendStaff;
-window.unsuspendStaff = unsuspendStaff;
-window.openInventoryModal = openInventoryModal;
-window.editInventory = editInventory;
-window.deleteInventory = deleteInventory;
-window.generateReport = generateReport;
-window.initMap = initMap;
+// Make functions globally available without crashing if an optional function is missing.
+if (typeof showTab === 'function') window.showTab = showTab;
+if (typeof logout === 'function') window.logout = logout;
+if (typeof openOrderModal === 'function') window.openOrderModal = openOrderModal;
+if (typeof closeModal === 'function') window.closeModal = closeModal;
+if (typeof editOrder === 'function') window.editOrder = editOrder;
+if (typeof deleteOrder === 'function') window.deleteOrder = deleteOrder;
+if (typeof openStaffModal === 'function') window.openStaffModal = openStaffModal;
+if (typeof editStaff === 'function') window.editStaff = editStaff;
+if (typeof deleteStaff === 'function') window.deleteStaff = deleteStaff;
+if (typeof suspendStaff === 'function') window.suspendStaff = suspendStaff;
+if (typeof unsuspendStaff === 'function') window.unsuspendStaff = unsuspendStaff;
+if (typeof openInventoryModal === 'function') window.openInventoryModal = openInventoryModal;
+if (typeof editInventory === 'function') window.editInventory = editInventory;
+if (typeof deleteInventory === 'function') window.deleteInventory = deleteInventory;
+if (typeof generateReport === 'function') window.generateReport = generateReport;
+if (typeof initMap === 'function') window.initMap = initMap;
