@@ -1,0 +1,182 @@
+// FIRESTORE SECURITY RULES FOR WATER STATION MANAGEMENT SYSTEM
+// 
+// To deploy these rules:
+// 1. Go to Firebase Console > Project > Firestore Database > Rules
+// 2. Replace existing rules with the content below
+// 3. Click Publish
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isSuperAdmin() {
+      return getUserRole() in ['super_admin'];
+    }
+
+    function isAdmin() {
+      return getUserRole() in ['super_admin', 'admin'];
+    }
+
+    function isStaff() {
+      return getUserRole() in ['super_admin', 'admin', 'station_staff'];
+    }
+
+    function isDriver() {
+      return getUserRole() in ['driver'];
+    }
+
+    function isCustomer() {
+      return getUserRole() in ['customer'];
+    }
+
+    function ownsDocument(userId) {
+      return request.auth.uid == userId;
+    }
+
+    // ===== USERS COLLECTION =====
+    match /users/{userId} {
+      // Read: Own profile or admin/super_admin can read all
+      allow read: if isAuthenticated() && (ownsDocument(userId) || isAdmin());
+      
+      // Create: Only super_admin can create users (before migration)
+      allow create: if isSuperAdmin();
+      
+      // Update: Users can update own profile, admin can update any
+      allow update: if ownsDocument(userId) || isAdmin();
+      
+      // Delete: Only super_admin
+      allow delete: if isSuperAdmin();
+    }
+
+    // ===== ORDERS COLLECTION =====
+    match /orders/{orderId} {
+      // Read: Customer can read own orders, staff/driver/admin can read all
+      allow read: if isAuthenticated() && (
+        resource.data.customerId == request.auth.uid ||
+        resource.data.driverId == request.auth.uid ||
+        isStaff()
+      );
+      
+      // Create: Customers, staff, admin can create
+      allow create: if isAuthenticated() && (isCustomer() || isStaff()) && request.resource.data.customerId == request.auth.uid;
+      
+      // Update: Creator, driver, staff can update with restrictions
+      allow update: if isAuthenticated() && (
+        resource.data.customerId == request.auth.uid ||
+        resource.data.driverId == request.auth.uid ||
+        isStaff()
+      );
+      
+      // Delete: Only admin/staff
+      allow delete: if isStaff();
+    }
+
+    // ===== INVENTORY COLLECTION =====
+    match /inventory/{productId} {
+      // Read: Everyone authenticated
+      allow read: if isAuthenticated();
+      
+      // Create: Admin/Staff only
+      allow create: if isStaff();
+      
+      // Update: Admin/Staff only
+      allow update: if isStaff();
+      
+      // Delete: Admin/Staff only
+      allow delete: if isStaff();
+    }
+
+    // ===== DELIVERIES COLLECTION =====
+    match /deliveries/{deliveryId} {
+      // Read: Driver can read assigned, staff/admin can read all
+      allow read: if isAuthenticated() && (
+        resource.data.driverId == request.auth.uid ||
+        isStaff()
+      );
+      
+      // Create: Staff/Admin only
+      allow create: if isStaff();
+      
+      // Update: Assigned driver or staff can update
+      allow update: if isAuthenticated() && (
+        resource.data.driverId == request.auth.uid ||
+        isStaff()
+      );
+      
+      // Delete: Admin only
+      allow delete: if isAdmin();
+    }
+
+    // ===== PAYMENTS COLLECTION =====
+    match /payments/{paymentId} {
+      // Read: Owner or staff
+      allow read: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        isStaff()
+      );
+      
+      // Create: Staff/Admin or user for own payment
+      allow create: if isAuthenticated() && (
+        isStaff() || 
+        request.resource.data.userId == request.auth.uid
+      );
+      
+      // Update: Staff only (for verification)
+      allow update: if isStaff();
+      
+      // Delete: Admin only
+      allow delete: if isAdmin();
+    }
+
+    // ===== REPORTS COLLECTION =====
+    match /reports/{reportId} {
+      // Read: Staff/Admin only
+      allow read: if isStaff();
+      
+      // Create: Staff/Admin only
+      allow create: if isStaff();
+      
+      // Update: Staff/Admin only
+      allow update: if isStaff();
+      
+      // Delete: Admin only
+      allow delete: if isAdmin();
+    }
+
+    // ===== NOTIFICATIONS COLLECTION =====
+    match /notifications/{notificationId} {
+      // Read: Own notifications
+      allow read: if isAuthenticated() && ownsDocument(resource.data.userId);
+      
+      // Create: System (via Cloud Functions)
+      allow create: if false;
+      
+      // Update: Own notifications
+      allow update: if isAuthenticated() && ownsDocument(resource.data.userId);
+      
+      // Delete: Own notifications
+      allow delete: if isAuthenticated() && ownsDocument(resource.data.userId);
+    }
+
+    // ===== AUDIT LOG COLLECTION =====
+    match /auditLogs/{logId} {
+      // Read: Admin only
+      allow read: if isAdmin();
+      
+      // Create: System only (via Cloud Functions)
+      allow create: if false;
+      
+      // Update/Delete: Not allowed
+      allow update, delete: if false;
+    }
+  }
+}

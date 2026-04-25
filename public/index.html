@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>H2GO - Water Management System</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        nav { display: none; }
+        nav.show { display: block; }
+        #app-container {
+            min-height: 100vh;
+            background: transparent;
+        }
+        #app-container.with-nav {
+            margin-top: 0;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <!-- Navigation Bar -->
+        <nav class="navbar navbar-expand-lg navbar-dark sticky-top" style="display: none;">
+            <div class="container-fluid">
+                <a class="navbar-brand" href="#/dashboard" onclick="routeTo('/dashboard'); return false;">Water Station Management System</a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="navbarNav">
+                    <ul class="navbar-nav me-auto">
+                        <li class="nav-item">
+                            <a class="nav-link" href="#/dashboard" data-route="/dashboard" onclick="routeTo('/dashboard'); return false;">
+                                Dashboard
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#/deliveries" data-route="/deliveries" onclick="routeTo('/deliveries'); return false;">
+                                Deliveries
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#/orders" data-route="/orders" onclick="routeTo('/orders'); return false;">
+                                Orders
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#/inventory" data-route="/inventory" onclick="routeTo('/inventory'); return false;">
+                                Inventory
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#/staff" data-route="/staff" onclick="routeTo('/staff'); return false;">
+                                Staff
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#/reports" data-route="/reports" onclick="routeTo('/reports'); return false;">
+                                Reports
+                            </a>
+                        </li>
+                    </ul>
+                    <ul class="navbar-nav">
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown">
+                                <span id="user-name">User</span>
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                                <li><a class="dropdown-item" href="#/profile" data-route="/profile" onclick="routeTo('/profile'); return false;">My Profile</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="#" onclick="logout()">Logout</a></li>
+                            </ul>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main App Container -->
+        <div id="app-container"></div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- API Client -->
+    <script src="js/api-client.js"></script>
+    
+    <!-- Router -->
+    <script src="js/router.js"></script>
+    
+    <!-- Components -->
+    <script src="js/components/login.js"></script>
+    <script src="js/components/dashboard.js"></script>
+    <script src="js/components/deliveries.js"></script>
+    <script src="js/components/orders.js"></script>
+    <script src="js/components/inventory.js"></script>
+    <script src="js/components/staff.js"></script>
+    <script src="js/components/reports.js"></script>
+    <script src="js/components/profile.js"></script>
+    
+    <!-- App Initialization -->
+    <script src="js/app.js"></script>
+</body>
+</html>

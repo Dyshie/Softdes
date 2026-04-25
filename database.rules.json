@@ -1,0 +1,84 @@
+  {
+    "rules": {
+      "users": {
+        "$uid": {
+          ".read": "auth != null && (auth.uid == $uid || root.child('users').child(auth.uid).child('role').val() == 'super_admin' || root.child('users').child(auth.uid).child('role').val() == 'admin')",
+          ".write": "auth != null && (auth.uid == $uid || root.child('users').child(auth.uid).child('role').val() == 'super_admin' || root.child('users').child(auth.uid).child('role').val() == 'admin')",
+          ".validate": "newData.hasChildren(['email', 'displayName', 'role', 'createdAt'])",
+          "role": {
+            ".validate": "newData.val() == 'super_admin' || newData.val() == 'admin' || newData.val() == 'station_staff' || newData.val() == 'driver' || newData.val() == 'customer'"
+          }
+        }
+      },
+      "orders": {
+        "$orderId": {
+          ".read": "auth != null && (data.child('customerId').val() == auth.uid || data.child('driverId').val() == auth.uid || root.child('users').child(auth.uid).child('role').val() == 'station_staff' || root.child('users').child(auth.uid).child('role').val() == 'admin' || root.child('users').child(auth.uid).child('role').val() == 'super_admin')",
+          ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() == 'station_staff' || root.child('users').child(auth.uid).child('role').val() == 'admin' || root.child('users').child(auth.uid).child('role').val() == 'super_admin')",
+          ".validate": "newData.hasChildren(['customerId', 'items', 'totalAmount', 'status', 'createdAt'])",
+          "status": {
+            ".validate": "newData.val() == 'pending' || newData.val() == 'confirmed' || newData.val() == 'processing' || newData.val() == 'ready' || newData.val() == 'in_transit' || newData.val() == 'delivered' || newData.val() == 'cancelled'"
+          }
+        }
+      },
+      "inventory": {
+        "$productId": {
+          ".read": "auth != null",
+          ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() == 'station_staff' || root.child('users').child(auth.uid).child('role').val() == 'admin' || root.child('users').child(auth.uid).child('role').val() == 'super_admin')",
+          ".validate": "newData.hasChildren(['name', 'price', 'quantity', 'unit'])"
+        }
+      },
+      "deliveries": {
+        "$deliveryId": {
+          ".read": "auth != null && (data.child('driverId').val() == auth.uid || root.child('users').child(auth.uid).child('role').val() == 'station_staff' || root.child('users').child(auth.uid).child('role').val() == 'admin' || root.child('users').child(auth.uid).child('role').val() == 'super_admin')",
+          ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() == 'station_staff' || root.child('users').child(auth.uid).child('role').val() == 'admin' || root.child('users').child(auth.uid).child('role').val() == 'super_admin')",
+          ".validate": "newData.hasChildren(['orderId', 'driverId', 'status'])",
+          "status": {
+            ".validate": "newData.val() == 'assigned' || newData.val() == 'en_route' || newData.val() == 'delivered' || newData.val() == 'failed'"
+          }
+        }
+      },
+      "payments": {
+        "$paymentId": {
+          ".read": "auth != null && (data.child('userId').val() == auth.uid || root.child('users').child(auth.uid).child('role').val() == 'station_staff' || root.child('users').child(auth.uid).child('role').val() == 'admin' || root.child('users').child(auth.uid).child('role').val() == 'super_admin')",
+          ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() == 'station_staff' || root.child('users').child(auth.uid).child('role').val() == 'admin' || root.child('users').child(auth.uid).child('role').val() == 'super_admin')",
+          ".validate": "newData.hasChildren(['orderId', 'userId', 'amount', 'method', 'status'])",
+          "status": {
+            ".validate": "newData.val() == 'pending' || newData.val() == 'completed' || newData.val() == 'failed' || newData.val() == 'refunded'"
+          }
+        }
+      },
+      "reports": {
+        "$reportId": {
+          ".read": "auth != null && (root.child('users').child(auth.uid).child('role').val() == 'station_staff' || root.child('users').child(auth.uid).child('role').val() == 'admin' || root.child('users').child(auth.uid).child('role').val() == 'super_admin')",
+          ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() == 'station_staff' || root.child('users').child(auth.uid).child('role').val() == 'admin' || root.child('users').child(auth.uid).child('role').val() == 'super_admin')"
+        }
+      },
+      "notifications": {
+        "$uid": {
+          "$notificationId": {
+            ".read": "auth.uid == $uid",
+            ".write": "auth.uid == $uid || root.child('users').child(auth.uid).child('role').val() == 'super_admin'",
+            ".validate": "newData.hasChildren(['type', 'title', 'message', 'read', 'createdAt'])",
+            "type": {
+              ".validate": "newData.val() == 'order' || newData.val() == 'delivery' || newData.val() == 'payment' || newData.val() == 'system' || newData.val() == 'inventory'"
+            }
+          }
+        }
+      },
+      "userSettings": {
+        "$uid": {
+          ".read": "auth.uid == $uid",
+          ".write": "auth.uid == $uid",
+          "notifications": {
+            ".validate": "newData.hasChildren(['emailNotifications', 'pushNotifications', 'orderUpdates', 'deliveryUpdates', 'inventoryAlerts', 'systemNotifications'])"
+          }
+        }
+      },
+      "auditLogs": {
+        "$logId": {
+          ".read": "root.child('users').child(auth.uid).child('role').val() == 'admin' || root.child('users').child(auth.uid).child('role').val() == 'super_admin'",
+          ".write": "false"
+        }
+      }
+    }
+  }
