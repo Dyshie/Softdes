@@ -152,8 +152,11 @@ router.register('/login', {
                                 <div class="d-grid">
                                     <button type="submit" class="btn btn-primary btn-lg">Login</button>
                                 </div>
+                                <div class="text-center mt-3">
+                                    <button type="button" id="forgot-password-btn" class="btn btn-link p-0">Forgot password?</button>
+                                </div>
                                 <hr class="my-4">
-                                <p class="text-center text-muted small">Demo credentials available upon request</p>
+                                <p class="text-center text-muted small">Use your assigned account email. If your password fails, use Forgot password to reset it.</p>
                                 <p class="text-center text-muted small mb-0">Build: <span id="build-label">${buildLabel}</span></p>
                             </form>
                         </div>
@@ -166,9 +169,16 @@ router.register('/login', {
         // Setup login form handler
         setTimeout(() => {
             const loginForm = document.getElementById('login-form');
+            const forgotPasswordButton = document.getElementById('forgot-password-btn');
+
             if (loginForm && !loginForm.dataset.listenerAdded) {
                 loginForm.addEventListener('submit', handleLogin);
                 loginForm.dataset.listenerAdded = 'true';
+            }
+
+            if (forgotPasswordButton && !forgotPasswordButton.dataset.listenerAdded) {
+                forgotPasswordButton.addEventListener('click', handleForgotPassword);
+                forgotPasswordButton.dataset.listenerAdded = 'true';
             }
         }, 100);
     },

@@ -131,7 +131,35 @@ function handleLogin(e) {
             });
         })
         .catch((error) => {
+            if (error && (error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found' || error.code === 'auth/invalid-login-credentials')) {
+                showNotification('Invalid email or password. Use Forgot password to reset your account.', 'error');
+                return;
+            }
+
             showNotification(error.message, 'error');
+        });
+}
+
+function handleForgotPassword() {
+    const emailInput = document.getElementById('email');
+    const email = (emailInput && emailInput.value ? emailInput.value : '').trim();
+
+    if (!email) {
+        showNotification('Enter your email first, then click Forgot password.', 'warning');
+        return;
+    }
+
+    auth.sendPasswordResetEmail(email)
+        .then(() => {
+            showNotification('Password reset email sent. Check your inbox and spam folder.', 'success');
+        })
+        .catch((error) => {
+            if (error && (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-email')) {
+                showNotification('Email not found. Please check the address and try again.', 'error');
+                return;
+            }
+
+            showNotification(error.message || 'Unable to send reset email right now.', 'error');
         });
 }
 
