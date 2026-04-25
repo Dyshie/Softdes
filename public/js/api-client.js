@@ -2,7 +2,7 @@
  * API Client for communicating with Express.js backend
  */
 class ApiClient {
-    constructor(baseURL = 'http://localhost:5000/api') {
+    constructor(baseURL = window.API_BASE_URL || (window.location.hostname.includes('localhost') ? 'http://localhost:5000/api' : '/api')) {
         this.baseURL = baseURL;
         this.token = localStorage.getItem('authToken');
     }
