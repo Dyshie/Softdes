@@ -32,7 +32,10 @@ app.use(cors({
         const allowedOrigins = [
             'http://localhost:3000',
             'http://localhost:5000',
-            'https://yourdomain.com'  // Replace with your actual domain
+            'https://yourdomain.com',  // Replace with your actual domain
+            'https://h2go-eee4d.web.app',
+            'https://h2go-eee4d.firebaseapp.com',
+            'https://dyshie.github.io'
         ];
 
         // In development, allow localhost
