@@ -4,6 +4,7 @@ let ordersRef = null;
 let staffRef = null;
 let inventoryRef = null;
 let inventoryData = {}; // Store inventory data for price lookups
+let inventoryListenersInitialized = false;
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', function() {
@@ -16,8 +17,14 @@ function initializeApp() {
     ordersRef = database.ref('orders');
     staffRef = database.ref('staff');
     inventoryRef = database.ref('inventory');
-    
-    // Load inventory data for product dropdown
+}
+
+function initializeInventoryListeners() {
+    if (inventoryListenersInitialized || !inventoryRef) {
+        return;
+    }
+
+    // Load inventory data for product dropdown.
     inventoryRef.once('value', (snapshot) => {
         if (snapshot.exists()) {
             snapshot.forEach((child) => {
@@ -30,8 +37,8 @@ function initializeApp() {
             });
         }
     });
-    
-    // Listen for real-time changes to inventory
+
+    // Listen for real-time changes to inventory after authentication.
     inventoryRef.on('child_added', (snapshot) => {
         const product = snapshot.val();
         inventoryData[snapshot.key] = {
@@ -40,7 +47,7 @@ function initializeApp() {
             id: snapshot.key
         };
     });
-    
+
     inventoryRef.on('child_changed', (snapshot) => {
         const product = snapshot.val();
         inventoryData[snapshot.key] = {
@@ -49,10 +56,12 @@ function initializeApp() {
             id: snapshot.key
         };
     });
-    
+
     inventoryRef.on('child_removed', (snapshot) => {
         delete inventoryData[snapshot.key];
     });
+
+    inventoryListenersInitialized = true;
 }
 
 function setupEventListeners() {
@@ -148,6 +157,7 @@ function checkAuthState() {
     auth.onAuthStateChanged((user) => {
         if (user) {
             currentUser = user;
+            initializeInventoryListeners();
             
             // Update router auth state
             router.setAuthenticated(true);
