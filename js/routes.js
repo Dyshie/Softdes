@@ -127,6 +127,7 @@ const realtimeDataManager = new RealtimeDataManager();
 router.register('/login', {
     title: 'Login - Water Station Management System',
     render(params) {
+        const buildLabel = window.APP_BUILD || 'local-dev';
         const appContainer = document.getElementById('app-container');
         appContainer.style.padding = '0';
         appContainer.style.minHeight = '100vh';
@@ -153,6 +154,7 @@ router.register('/login', {
                                 </div>
                                 <hr class="my-4">
                                 <p class="text-center text-muted small">Demo credentials available upon request</p>
+                                <p class="text-center text-muted small mb-0">Build: <span id="build-label">${buildLabel}</span></p>
                             </form>
                         </div>
                     </div>
