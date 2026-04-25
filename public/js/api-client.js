@@ -40,9 +40,18 @@ class ApiClient {
             }
 
             const response = await fetch(`${this.baseURL}${endpoint}`, options);
+            const contentType = response.headers.get('content-type') || '';
+            const isJsonResponse = contentType.includes('application/json');
 
             if (!response.ok) {
-                const error = await response.json().catch(() => ({}));
+                const error = isJsonResponse
+                    ? await response.json().catch(() => ({}))
+                    : {};
+
+                if (!isJsonResponse) {
+                    throw new Error('Backend API is unavailable on this domain. The /api route is returning HTML instead of JSON. Deploy backend (Functions/Cloud Run) or configure window.API_BASE_URL.');
+                }
+
                 const validationMessage = Array.isArray(error.errors)
                     ? error.errors
                         .map((item) => item?.msg || item?.message || item?.error)
@@ -56,6 +65,10 @@ class ApiClient {
                     validationMessage ||
                     `API Error: ${response.statusText}`
                 );
+            }
+
+            if (!isJsonResponse) {
+                throw new Error('Unexpected API response format. Expected JSON from backend API.');
             }
 
             return await response.json();
