@@ -3,6 +3,8 @@
  */
 async function renderDashboard() {
     const container = document.getElementById('app-container');
+    const currentUser = getCurrentUser() || {};
+    const isAdmin = currentUser.role === 'super_admin' || currentUser.role === 'admin';
     
     container.innerHTML = `
         <div class="container-fluid p-4">
@@ -54,6 +56,33 @@ async function renderDashboard() {
                     </div>
                 </div>
             </div>
+
+            ${isAdmin ? `
+                <div class="row mt-4">
+                    <div class="col-lg-5 mb-4">
+                        <div class="card h-100 shadow-sm">
+                            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0">System Diagnostics</h5>
+                                <span class="badge bg-secondary">Admin only</span>
+                            </div>
+                            <div class="card-body" id="diagnostics-container">
+                                <div class="text-muted">Loading diagnostics...</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-7 mb-4">
+                        <div class="card h-100 shadow-sm">
+                            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0">Recent Activity</h5>
+                                <span class="badge bg-info text-dark">Operational timeline</span>
+                            </div>
+                            <div class="card-body" id="activity-container">
+                                <div class="text-muted">Loading activity...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            ` : ''}
         </div>
     `;
 
@@ -96,6 +125,94 @@ async function renderDashboard() {
         const recentOrdersContainer = document.getElementById('recent-orders-container');
         if (recentOrdersContainer) {
             recentOrdersContainer.innerHTML = '<div class="alert alert-danger">Error loading data</div>';
+        }
+    }
+
+    if (isAdmin) {
+        await loadAdminDashboardPanels();
+    }
+}
+
+function escapeDashboardHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, (character) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+    }[character]));
+}
+
+async function loadAdminDashboardPanels() {
+    try {
+        const [diagnostics, activity] = await Promise.all([
+            apiClient.dashboard.getDiagnostics(),
+            apiClient.dashboard.getActivity()
+        ]);
+
+        const diagnosticsContainer = document.getElementById('diagnostics-container');
+        if (diagnosticsContainer) {
+            const warnings = Array.isArray(diagnostics.warnings) ? diagnostics.warnings : [];
+            const smtpStatus = diagnostics.smtp || {};
+
+            diagnosticsContainer.innerHTML = `
+                <div class="small text-muted mb-3">API base URL: ${escapeDashboardHtml(apiClient.baseURL)}</div>
+                <div class="list-group list-group-flush mb-3">
+                    <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                        <span>Firebase DB</span>
+                        <span class="badge ${diagnostics.firebaseDatabaseConfigured ? 'bg-success' : 'bg-danger'}">${diagnostics.firebaseDatabaseConfigured ? 'Configured' : 'Missing'}</span>
+                    </div>
+                    <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                        <span>Firebase API key</span>
+                        <span class="badge ${diagnostics.firebaseApiKeyConfigured ? 'bg-success' : 'bg-danger'}">${diagnostics.firebaseApiKeyConfigured ? 'Configured' : 'Missing'}</span>
+                    </div>
+                    <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                        <span>SMTP</span>
+                        <span class="badge ${smtpStatus.smtpHealthy ? 'bg-success' : 'bg-warning text-dark'}">${smtpStatus.smtpHealthy ? 'Healthy' : 'Needs attention'}</span>
+                    </div>
+                </div>
+                ${warnings.length > 0 ? `<div class="alert alert-warning mb-0">${warnings.map(escapeDashboardHtml).join('<br>')}</div>` : '<div class="alert alert-success mb-0">No diagnostics warnings detected.</div>'}
+            `;
+        }
+
+        const activityContainer = document.getElementById('activity-container');
+        if (activityContainer) {
+            if (!Array.isArray(activity) || activity.length === 0) {
+                activityContainer.innerHTML = '<div class="text-muted">No recent activity available.</div>';
+                return;
+            }
+
+            activityContainer.innerHTML = `
+                <div class="list-group list-group-flush">
+                    ${activity.map((entry) => {
+                        const time = entry.createdAt ? new Date(entry.createdAt).toLocaleString() : 'N/A';
+                        return `
+                            <div class="list-group-item px-0">
+                                <div class="d-flex justify-content-between align-items-start gap-3">
+                                    <div>
+                                        <div class="fw-semibold">${escapeDashboardHtml(entry.title)}</div>
+                                        <div class="text-muted small">${escapeDashboardHtml(entry.description)}</div>
+                                        <div class="text-muted small mt-1">By ${escapeDashboardHtml(entry.actorName || 'System')}</div>
+                                    </div>
+                                    <span class="text-muted small text-nowrap">${escapeDashboardHtml(time)}</span>
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+        }
+    } catch (error) {
+        console.error('Error loading admin dashboard panels:', error);
+
+        const diagnosticsContainer = document.getElementById('diagnostics-container');
+        if (diagnosticsContainer) {
+            diagnosticsContainer.innerHTML = '<div class="alert alert-danger mb-0">Error loading diagnostics</div>';
+        }
+
+        const activityContainer = document.getElementById('activity-container');
+        if (activityContainer) {
+            activityContainer.innerHTML = '<div class="alert alert-danger mb-0">Error loading activity</div>';
         }
     }
 }

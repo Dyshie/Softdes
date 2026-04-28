@@ -288,6 +288,51 @@ const emailTemplates = {
             </body>
             </html>
         `
+    },
+
+    passwordReset: {
+        subject: 'Password Reset Request - Water Station',
+        html: `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <style>
+                    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                    .header { background: #0ea5e9; color: white; padding: 20px; text-align: center; }
+                    .content { padding: 20px; background: #f9f9f9; }
+                    .footer { background: #333; color: white; padding: 10px; text-align: center; font-size: 12px; }
+                    .link-box { background: white; padding: 15px; margin: 10px 0; border-radius: 5px; border: 1px dashed #6c757d; word-break: break-all; }
+                    .button { display: inline-block; background: #0ea5e9; color: white; text-decoration: none; padding: 12px 18px; border-radius: 6px; font-weight: bold; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <h1>Reset Your Password</h1>
+                    </div>
+                    <div class="content">
+                        <p>Dear {{displayName}},</p>
+                        <p>We received a request to reset the password for your Water Station account ({{loginEmail}}).</p>
+
+                        <div class="link-box">
+                            <p><strong>Reset Link:</strong></p>
+                            <p><a class="button" href="{{resetLink}}">Reset Password</a></p>
+                            <p style="margin-top: 12px; font-size: 13px;">If the button does not work, copy and paste this link into your browser:</p>
+                            <p>{{resetLink}}</p>
+                        </div>
+
+                        <p>If you did not request this reset, you can safely ignore this email.</p>
+                    </div>
+                    <div class="footer">
+                        <p>Water Station Management System<br>
+                        This is an automated message, please do not reply.</p>
+                    </div>
+                </div>
+            </body>
+            </html>
+        `
     }
 };
 

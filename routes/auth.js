@@ -26,6 +26,26 @@ const getUserCount = async () => {
     return snapshot.exists() ? snapshot.numChildren() : 0;
 };
 
+const findUserProfileByEmail = async (email) => {
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    const snapshot = await database.ref('users').orderByChild('email').equalTo(normalizedEmail).once('value');
+    let userProfile = null;
+
+    snapshot.forEach((child) => {
+        const profile = child.val() || {};
+        const profileEmail = String(profile.email || '').trim().toLowerCase();
+
+        if (profileEmail === normalizedEmail) {
+            userProfile = {
+                uid: child.key,
+                ...profile
+            };
+        }
+    });
+
+    return userProfile;
+};
+
 // Check whether initial registration is allowed
 router.get('/setup-status', async (req, res) => {
     try {
@@ -153,6 +173,82 @@ router.post('/login', [
         res.status(500).json({
             error: 'Internal server error',
             message: 'Login failed due to server error'
+        });
+    }
+});
+
+// Send password reset email for any active account role
+router.post('/forgot-password', [
+    body('email').isEmail().normalizeEmail()
+], async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({
+            error: 'Validation failed',
+            details: errors.array()
+        });
+    }
+
+    try {
+        const email = String(req.body.email || '').trim().toLowerCase();
+        const userProfile = await findUserProfileByEmail(email);
+
+        if (!userProfile) {
+            return res.status(404).json({
+                error: 'No account found for that email'
+            });
+        }
+
+        if (userProfile.status && userProfile.status !== 'active') {
+            return res.status(403).json({
+                error: 'Account is not active'
+            });
+        }
+
+        let authUser = null;
+        try {
+            authUser = await auth.getUserByEmail(email);
+        } catch (authError) {
+            if (authError.code === 'auth/user-not-found') {
+                return res.status(404).json({
+                    error: 'No account found for that email'
+                });
+            }
+
+            throw authError;
+        }
+
+        if (authUser.disabled) {
+            return res.status(403).json({
+                error: 'Account is not active'
+            });
+        }
+
+        const resetLink = await auth.generatePasswordResetLink(email);
+        const emailSent = await notificationService.sendEmail(email, 'passwordReset', {
+            displayName: userProfile.displayName || email,
+            loginEmail: email,
+            resetLink
+        });
+
+        if (!emailSent && process.env.NODE_ENV === 'production') {
+            return res.status(502).json({
+                error: 'Failed to send password reset email'
+            });
+        }
+
+        res.status(200).json({
+            message: emailSent
+                ? 'Password reset instructions have been sent to the registered email address.'
+                : 'Password reset link generated. Email delivery is unavailable, so use the link below in development.',
+            ...(process.env.NODE_ENV !== 'production' || !emailSent
+                ? { resetLink }
+                : {})
+        });
+    } catch (error) {
+        console.error('Forgot password error:', error);
+        res.status(500).json({
+            error: 'Failed to process password reset request'
         });
     }
 });

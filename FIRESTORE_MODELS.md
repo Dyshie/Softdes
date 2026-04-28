@@ -1,6 +1,6 @@
 # Firebase Realtime Database Data Models
 
-This document defines the Realtime Database structure across the whole system (mobile + Express/web backend).
+This document defines the Realtime Database structure across the whole system (mobile + customer client + Express/web backend).
 
 ## Database Structure Overview
 
@@ -26,6 +26,194 @@ Notes:
 - `staff`, `notifications`, `userSettings`, and `reports` are actively used by the Express routes.
 - `deliveries` is now exposed through the `/api/deliveries` runtime route as a derived view of `/orders` filtered by `assignedDriver`.
 - `payments` and `auditLogs` are present in database rules and Firestore rules, but are not fully exposed via current Express CRUD routes.
+
+---
+
+## Customer Client-Side Schema
+
+This section documents the subset of the Realtime Database that a customer-facing client should use. The customer app should treat admin-only nodes as inaccessible and should rely on the same canonical field names used by the runtime backend.
+
+### Customer Access Map
+
+| Node | Path | Customer use | Access |
+|------|------|--------------|--------|
+| users | `/users/{uid}` | Own profile, account status, and verification state | Read own record; update through auth/profile flow |
+| orders | `/orders/{orderId}` | Place new orders, view order history, and track order status | Create and read own orders only |
+| inventory | `/inventory/{productId}` | Product catalog, pricing, and stock availability | Read-only |
+| notifications | `/notifications/{uid}/{notificationId}` | Order updates, delivery alerts, and system messages | Read own notifications; mark as read or delete own entries |
+| userSettings | `/userSettings/{uid}/notifications` | Notification preferences | Read and update own settings |
+| deliveries | Derived from `/orders` | Delivery progress for the customer's own orders | Read-only derived view |
+
+### Customer Profile Schema
+
+**Path**: `/users/{uid}`
+
+```javascript
+{
+  "{uid}": {
+    email: string,
+    displayName: string,
+    phone: string,
+    role: string,                     // usually 'customer'
+    status: string,                   // 'active' | 'inactive' | 'suspended'
+    createdAt: string,                // ISO 8601
+    updatedAt: string,                // ISO 8601
+    tempPassword: boolean,
+    otpVerified: boolean,
+    otpRequestedAt: string | null,
+    otpVerifiedAt: string | null,
+    passwordChangedAt: string | null
+  }
+}
+```
+
+Notes:
+- `otpHash` is server-only and should not be exposed to the customer client.
+- Customer clients should read the profile through the authenticated user session, not by scanning the entire `/users` node.
+
+### Customer Order Schema
+
+**Path**: `/orders/{orderId}`
+
+```javascript
+{
+  "{orderId}": {
+    customerId: string,
+    customerName: string,
+    customerPhone: string,
+    customerAddress: string,
+
+    items: [
+      {
+        productId: string,
+        productName: string,
+        quantity: number,
+        unitPrice: number,
+        total: number,
+        price: number
+      }
+    ],
+
+    totalAmount: number,
+    status: string,                   // 'pending' | 'confirmed' | 'processing' | 'ready' | 'in_transit' | 'delivered' | 'cancelled'
+    scheduledFor: string | null,
+    assignedDriver: string | null,
+
+    createdBy: string,
+    createdAt: string,
+    updatedBy: string | null,
+    updatedAt: string | null
+  }
+}
+```
+
+Customer usage notes:
+- `customerId` should always match the authenticated user UID.
+- `items[]` is the canonical line-item structure for the customer client.
+- `assignedDriver` can be used as a reference for delivery tracking, but the driver details are resolved elsewhere.
+
+### Customer Inventory Schema
+
+**Path**: `/inventory/{productId}`
+
+```javascript
+{
+  "{productId}": {
+    name: string,
+    description: string,
+    category: string,
+    pricing: {
+      costPrice: number,
+      sellingPrice: number,
+      markup: number
+    },
+    stock: {
+      current: number,
+      reserved: number,
+      available: number,
+      reorderLevel: number,
+      reorderQuantity: number
+    },
+    price: number,
+    quantity: number,
+    unit: string,
+    image: string,
+    barcode: string,
+    status: string,
+    createdAt: string,
+    updatedAt: string
+  }
+}
+```
+
+Customer usage notes:
+- Inventory is read-only for customer clients.
+- `price` and `quantity` remain compatibility fields, but `pricing.sellingPrice` and `stock.current` are the canonical runtime values.
+- Customer UI should display only active, sellable products.
+
+### Customer Notifications Schema
+
+**Path**: `/notifications/{uid}/{notificationId}`
+
+```javascript
+{
+  "{uid}": {
+    "{notificationId}": {
+      type: string,                   // 'order' | 'delivery' | 'payment' | 'system' | 'inventory'
+      title: string,
+      message: string,
+      data: object,
+      read: boolean,
+      readAt: string | null,
+      createdAt: string,
+      expiresAt: string
+    }
+  }
+}
+```
+
+### Customer Notification Settings Schema
+
+**Path**: `/userSettings/{uid}/notifications`
+
+```javascript
+{
+  "{uid}": {
+    notifications: {
+      emailNotifications: boolean,
+      pushNotifications: boolean,
+      orderUpdates: boolean,
+      deliveryUpdates: boolean,
+      inventoryAlerts: boolean,
+      systemNotifications: boolean
+    }
+  }
+}
+```
+
+### Customer Delivery View
+
+The customer client should treat deliveries as a derived read model from orders, not as a separate write collection.
+
+```javascript
+{
+  orderId: string,
+  customerId: string,
+  customerName: string,
+  customerPhone: string,
+  customerAddress: string,
+  items: array,
+  totalAmount: number,
+  status: string,
+  assignedDriver: string | null,
+  createdAt: string,
+  updatedAt: string
+}
+```
+
+Customer usage notes:
+- The customer should only see deliveries linked to their own `customerId`.
+- The delivery view is read-only and should update when the backing order status changes.
 
 ---
 

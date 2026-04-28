@@ -23,6 +23,9 @@ async function renderLogin() {
                                     <input type="password" class="form-control" id="password" required>
                                 </div>
                                 <button type="submit" class="btn btn-primary w-100">Login</button>
+                                <div class="text-center mt-3">
+                                    <button type="button" class="btn btn-link p-0" id="forgot-password-btn">Forgot password?</button>
+                                </div>
                             </form>
                             <hr>
                             <p class="text-center text-muted small">
@@ -36,6 +39,11 @@ async function renderLogin() {
     `;
 
     document.getElementById('login-form').addEventListener('submit', handleLogin);
+
+    const forgotPasswordButton = document.getElementById('forgot-password-btn');
+    if (forgotPasswordButton) {
+        forgotPasswordButton.addEventListener('click', handleForgotPassword);
+    }
 }
 
 /**
@@ -60,6 +68,29 @@ async function handleLogin(e) {
         routeTo(getHomeRouteForUser(response.user));
     } catch (error) {
         alert('Login failed: ' + error.message);
+    }
+}
+
+/**
+ * Handle forgot password request
+ */
+async function handleForgotPassword() {
+    try {
+        const email = document.getElementById('email').value.trim();
+
+        if (!email) {
+            alert('Enter your email first, then click Forgot password.');
+            return;
+        }
+
+        const response = await apiClient.auth.forgotPassword(email);
+        const resetMessage = response.resetLink
+            ? `${response.message}\n\nDevelopment reset link:\n${response.resetLink}`
+            : (response.message || 'Password reset instructions have been sent to your email.');
+
+        alert(resetMessage);
+    } catch (error) {
+        alert('Password reset failed: ' + error.message);
     }
 }
 

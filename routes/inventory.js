@@ -11,6 +11,18 @@ const toNumber = (value, fallback = 0) => {
     return Number.isFinite(parsed) ? parsed : fallback;
 };
 
+const getLowStockThreshold = (product = {}) => {
+    if (typeof product.lowStockThreshold !== 'undefined') {
+        return toNumber(product.lowStockThreshold, 10);
+    }
+
+    if (typeof product.stock?.reorderLevel !== 'undefined') {
+        return toNumber(product.stock.reorderLevel, 10);
+    }
+
+    return 10;
+};
+
 const normalizeInventoryProduct = (product = {}) => {
     const basePrice = typeof product.price !== 'undefined'
         ? toNumber(product.price, 0)
@@ -33,10 +45,16 @@ const normalizeInventoryProduct = (product = {}) => {
         ? toNumber(product.pricing.markup, 0)
         : Math.max(basePrice - costPrice, 0);
 
+    const lowStockThreshold = getLowStockThreshold(product);
+    const reorderQuantity = typeof product.stock?.reorderQuantity !== 'undefined'
+        ? toNumber(product.stock.reorderQuantity, 50)
+        : 50;
+
     return {
         ...product,
         price: basePrice,
         quantity: currentQty,
+        lowStockThreshold,
         pricing: {
             ...(product.pricing || {}),
             costPrice,
@@ -48,12 +66,8 @@ const normalizeInventoryProduct = (product = {}) => {
             current: currentQty,
             reserved: reservedQty,
             available: availableQty,
-            reorderLevel: typeof product.stock?.reorderLevel !== 'undefined'
-                ? toNumber(product.stock.reorderLevel, 10)
-                : 10,
-            reorderQuantity: typeof product.stock?.reorderQuantity !== 'undefined'
-                ? toNumber(product.stock.reorderQuantity, 50)
-                : 50
+            reorderLevel: lowStockThreshold,
+            reorderQuantity
         }
     };
 };
@@ -112,6 +126,7 @@ router.post('/', authMiddleware, requireRole('super_admin', 'admin', 'station_st
     body('stock.available').optional().isInt({ min: 0 }).withMessage('Available stock must be non-negative integer'),
     body('stock.reorderLevel').optional().isInt({ min: 0 }).withMessage('Reorder level must be non-negative integer'),
     body('stock.reorderQuantity').optional().isInt({ min: 1 }).withMessage('Reorder quantity must be positive integer'),
+    body('lowStockThreshold').optional().isInt({ min: 0 }).withMessage('Low stock threshold must be non-negative integer'),
     body('price').optional().isFloat({ min: 0 }).withMessage('Price must be non-negative'),
     body('quantity').optional().isInt({ min: 0 }).withMessage('Quantity must be non-negative integer'),
     body('unit').trim().toLowerCase().isIn(['piece', 'liter', 'box', 'kg', 'gallon']).withMessage('Invalid unit'),
@@ -136,6 +151,7 @@ router.post('/', authMiddleware, requireRole('super_admin', 'admin', 'station_st
     }
 
     try {
+        const lowStockThreshold = req.body.lowStockThreshold ?? req.body.stock?.reorderLevel ?? 10;
         const timestamp = new Date().toISOString();
         const productData = normalizeInventoryProduct({
             name: req.body.name,
@@ -150,11 +166,12 @@ router.post('/', authMiddleware, requireRole('super_admin', 'admin', 'station_st
                 current: req.body.stock?.current ?? req.body.quantity ?? 0,
                 reserved: req.body.stock?.reserved ?? 0,
                 available: req.body.stock?.available,
-                reorderLevel: req.body.stock?.reorderLevel ?? 10,
+                reorderLevel: req.body.stock?.reorderLevel ?? lowStockThreshold,
                 reorderQuantity: req.body.stock?.reorderQuantity ?? 50
             },
             price: req.body.price,
             quantity: req.body.quantity,
+            lowStockThreshold,
             unit: req.body.unit,
             image: req.body.image || '',
             barcode: req.body.barcode || '',
@@ -196,6 +213,7 @@ router.put('/:id', authMiddleware, requireRole('super_admin', 'admin', 'station_
     body('stock.available').optional().isInt({ min: 0 }).withMessage('Available stock must be non-negative integer'),
     body('stock.reorderLevel').optional().isInt({ min: 0 }).withMessage('Reorder level must be non-negative integer'),
     body('stock.reorderQuantity').optional().isInt({ min: 1 }).withMessage('Reorder quantity must be positive integer'),
+    body('lowStockThreshold').optional().isInt({ min: 0 }).withMessage('Low stock threshold must be non-negative integer'),
     body('price').optional().isFloat({ min: 0 }).withMessage('Price must be non-negative'),
     body('quantity').optional().isInt({ min: 0 }).withMessage('Quantity must be non-negative integer'),
     body('unit').optional().trim().toLowerCase().isIn(['piece', 'liter', 'box', 'kg', 'gallon']).withMessage('Invalid unit'),

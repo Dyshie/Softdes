@@ -3,18 +3,24 @@ const { database } = require('../config/firebase');
 const authMiddleware = require('../middleware/authentication');
 const { requireRole } = require('../middleware/authorization');
 const { normalizeOrder } = require('../utils/orderNormalization');
+const { buildDriverAssignmentLookup, resolveAssignedDriverUid } = require('../utils/driverAssignment');
 
 const router = express.Router();
 
 router.get('/', authMiddleware, requireRole('driver'), async (req, res) => {
     try {
-        const snapshot = await database.ref('orders').once('value');
+        const [snapshot, staffSnapshot] = await Promise.all([
+            database.ref('orders').once('value'),
+            database.ref('staff').once('value')
+        ]);
+        const driverLookup = buildDriverAssignmentLookup(staffSnapshot);
         const deliveries = [];
 
         snapshot.forEach((child) => {
             const order = normalizeOrder(child.val() || {});
+            const assignedDriver = resolveAssignedDriverUid(order.assignedDriver || order.assignedDriverId, driverLookup);
 
-            if (order.assignedDriver !== req.user.uid) {
+            if (assignedDriver !== req.user.uid) {
                 return;
             }
 
@@ -24,7 +30,8 @@ router.get('/', authMiddleware, requireRole('driver'), async (req, res) => {
 
             deliveries.push({
                 id: child.key,
-                ...order
+                ...order,
+                assignedDriver
             });
         });
 

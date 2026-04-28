@@ -1,8 +1,22 @@
 /**
  * API Client for communicating with Express.js backend
  */
+function resolveApiBaseUrl() {
+    const searchParams = new URLSearchParams(window.location.search);
+    const queryApiUrl = searchParams.get('api');
+    const storedApiUrl = localStorage.getItem('apiBaseUrl');
+    const isLocalHost = window.location.hostname.includes('localhost');
+
+    return (
+        window.API_BASE_URL ||
+        queryApiUrl ||
+        storedApiUrl ||
+        (isLocalHost ? 'http://localhost:5000/api' : '/api')
+    );
+}
+
 class ApiClient {
-    constructor(baseURL = window.API_BASE_URL || (window.location.hostname.includes('localhost') ? 'http://localhost:5000/api' : '/api')) {
+    constructor(baseURL = resolveApiBaseUrl()) {
         this.baseURL = baseURL;
         this.token = localStorage.getItem('authToken');
     }
@@ -13,6 +27,15 @@ class ApiClient {
     setToken(token) {
         this.token = token;
         localStorage.setItem('authToken', token);
+    }
+
+    /**
+     * Set backend base URL and persist it for future loads
+     */
+    setBaseURL(baseURL) {
+        this.baseURL = baseURL.trim();
+        localStorage.setItem('apiBaseUrl', this.baseURL);
+        window.API_BASE_URL = this.baseURL;
     }
 
     /**
@@ -85,6 +108,7 @@ class ApiClient {
         login: (email, password) => this.request('POST', '/auth/login', { email, password }),
         register: (email, password, displayName) => this.request('POST', '/auth/register', { email, password, displayName }),
         setupStatus: () => this.request('GET', '/auth/setup-status'),
+        forgotPassword: (email) => this.request('POST', '/auth/forgot-password', { email }),
         createUser: (data) => this.request('POST', '/auth/users', data),
         getProfile: () => this.request('GET', '/auth/me'),
         updateProfile: (data) => this.request('PUT', '/auth/me', data),
@@ -136,7 +160,9 @@ class ApiClient {
      */
     dashboard = {
         getStats: () => this.request('GET', '/dashboard/stats'),
-        getRecentOrders: () => this.request('GET', '/dashboard/recent-orders')
+        getRecentOrders: () => this.request('GET', '/dashboard/recent-orders'),
+        getDiagnostics: () => this.request('GET', '/dashboard/diagnostics'),
+        getActivity: () => this.request('GET', '/dashboard/activity')
     };
 
     /**
@@ -152,6 +178,21 @@ class ApiClient {
      */
     deliveries = {
         getAll: () => this.request('GET', '/deliveries')
+    };
+
+    /**
+     * Notifications endpoints
+     */
+    notifications = {
+        getAll: () => this.request('GET', '/notifications'),
+        getUnreadCount: () => this.request('GET', '/notifications/unread-count'),
+        markRead: (id) => this.request('PATCH', `/notifications/${id}/read`),
+        markAllRead: () => this.request('PATCH', '/notifications/mark-all-read'),
+        readAll: () => this.request('PATCH', '/notifications/mark-all-read'),
+        delete: (id) => this.request('DELETE', `/notifications/${id}`),
+        test: (data) => this.request('POST', '/notifications/test', data),
+        getSettings: () => this.request('GET', '/notifications/settings'),
+        updateSettings: (data) => this.request('PUT', '/notifications/settings', data)
     };
 
     /**

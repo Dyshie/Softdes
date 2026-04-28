@@ -8,6 +8,18 @@ const { normalizeOrder } = require('../utils/orderNormalization');
 
 const router = express.Router();
 
+const getLowStockThreshold = (product = {}) => {
+    if (typeof product.lowStockThreshold !== 'undefined') {
+        return Number(product.lowStockThreshold);
+    }
+
+    if (typeof product.stock?.reorderLevel !== 'undefined') {
+        return Number(product.stock.reorderLevel);
+    }
+
+    return 10;
+};
+
 // Get all orders
 router.get('/', authMiddleware, requireRole('super_admin', 'admin', 'station_staff'), async (req, res) => {
     try {
@@ -141,7 +153,7 @@ router.post('/', authMiddleware, requireRole('super_admin', 'admin', 'station_st
                 stock: updatedProduct.stock
             });
 
-            if (updatedQuantity <= 10) {
+            if (updatedQuantity <= getLowStockThreshold(currentProduct)) {
                 lowStockAlerts.push({
                     productId,
                     name: updatedProduct.name || productId,
@@ -152,10 +164,18 @@ router.post('/', authMiddleware, requireRole('super_admin', 'admin', 'station_st
 
         const computedTotalAmount = normalizedItems.reduce((sum, item) => sum + Number(item.total || 0), 0);
 
+        let assignedDriver = req.body.assignedDriver || null;
+        if (assignedDriver) {
+            const staffSnapshot = await database.ref('staff').once('value');
+            const { buildDriverAssignmentLookup, resolveAssignedDriverUid } = require('../utils/driverAssignment');
+            assignedDriver = resolveAssignedDriverUid(assignedDriver, buildDriverAssignmentLookup(staffSnapshot));
+        }
+
         const orderData = {
             ...req.body,
             items: normalizedItems,
             totalAmount: Number(req.body.totalAmount ?? computedTotalAmount),
+            assignedDriver,
             createdBy: req.user.uid,
             createdAt: new Date().toISOString(),
             status: req.body.status || 'pending'
@@ -188,11 +208,17 @@ router.post('/', authMiddleware, requireRole('super_admin', 'admin', 'station_st
 router.put('/:id', authMiddleware, requireRole('super_admin', 'admin', 'station_staff'), async (req, res) => {
     try {
         const orderRef = database.ref(`orders/${req.params.id}`);
-        const snapshot = await orderRef.once('value');
+        const [snapshot, staffSnapshot] = await Promise.all([
+            orderRef.once('value'),
+            database.ref('staff').once('value')
+        ]);
 
         if (!snapshot.exists()) {
             return res.status(404).json({ error: 'Order not found' });
         }
+
+        const { buildDriverAssignmentLookup, resolveAssignedDriverUid } = require('../utils/driverAssignment');
+        const driverLookup = buildDriverAssignmentLookup(staffSnapshot);
 
         const updatedData = {
             ...snapshot.val(),
@@ -200,6 +226,10 @@ router.put('/:id', authMiddleware, requireRole('super_admin', 'admin', 'station_
             updatedAt: new Date().toISOString(),
             updatedBy: req.user.uid
         };
+
+        if (typeof updatedData.assignedDriver !== 'undefined') {
+            updatedData.assignedDriver = resolveAssignedDriverUid(updatedData.assignedDriver, driverLookup);
+        }
 
         await orderRef.set(updatedData);
 
@@ -224,7 +254,10 @@ router.patch('/:id/status', authMiddleware, [
 
     try {
         const orderRef = database.ref(`orders/${req.params.id}`);
-        const snapshot = await orderRef.once('value');
+        const [snapshot, staffSnapshot] = await Promise.all([
+            orderRef.once('value'),
+            database.ref('staff').once('value')
+        ]);
 
         if (!snapshot.exists()) {
             return res.status(404).json({ error: 'Order not found' });
@@ -238,9 +271,12 @@ router.patch('/:id/status', authMiddleware, [
         }
 
         const currentOrder = snapshot.val();
+        const { buildDriverAssignmentLookup, resolveAssignedDriverUid } = require('../utils/driverAssignment');
+        const driverLookup = buildDriverAssignmentLookup(staffSnapshot);
+        const assignedDriverUid = resolveAssignedDriverUid(currentOrder.assignedDriver || currentOrder.assignedDriverId, driverLookup);
 
         if (req.user.role === 'driver') {
-            if (currentOrder.assignedDriver && currentOrder.assignedDriver !== req.user.uid) {
+            if (assignedDriverUid && assignedDriverUid !== req.user.uid) {
                 return res.status(403).json({ error: 'You can only update deliveries assigned to you' });
             }
 
@@ -260,12 +296,21 @@ router.patch('/:id/status', authMiddleware, [
             return res.status(403).json({ error: 'Insufficient permissions to change order status' });
         }
 
-        await orderRef.update({
+        const updateData = {
             status,
             updatedBy: req.user.uid,
-            updatedAt: new Date().toISOString(),
-            assignedDriver: req.body.assignedDriver || currentOrder.assignedDriver
-        });
+            updatedAt: new Date().toISOString()
+        };
+
+        const assignedDriver = typeof req.body.assignedDriver !== 'undefined'
+            ? resolveAssignedDriverUid(req.body.assignedDriver, driverLookup)
+            : assignedDriverUid;
+
+        if (typeof assignedDriver !== 'undefined') {
+            updateData.assignedDriver = assignedDriver;
+        }
+
+        await orderRef.update(updateData);
 
         // Send status update notification
         notificationService.sendOrderStatusUpdate(req.params.id, status);

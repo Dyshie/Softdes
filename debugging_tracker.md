@@ -381,3 +381,85 @@ Validation:
 - Station_staff route sweep: `/dashboard`, `/orders`, `/inventory`, and `/profile` loaded; `/staff`, `/reports`, and `/deliveries` fell back to Dashboard.
 - Super_admin route sweep: `/dashboard`, `/orders`, `/inventory`, `/staff`, `/reports`, and `/profile` loaded; `/deliveries` fell back to Dashboard.
 - Driver route sweep: `/deliveries` and `/profile` loaded; `/dashboard`, `/orders`, `/inventory`, `/staff`, and `/reports` all fell back to Deliveries.
+
+## Fix 19: Forgot Password Login Flow
+Status: Done
+
+What changed:
+- Added a `Forgot password?` action to the active login page so users can request a reset directly from the login card.
+- Added `POST /api/auth/forgot-password` with account lookup checks against both Firebase Auth and `/users`, plus an active-account check before generating a reset link.
+- Kept the flow role-agnostic so super_admin, admin, station_staff, driver, and customer accounts all use the same reset path.
+- Added a `passwordReset` email template and exposed the request through `apiClient.auth.forgotPassword(...)`.
+
+Validation:
+- Ran `get_errors` on `routes/auth.js`, `public/js/api-client.js`, `public/js/components/login.js`, and `templates/emailTemplates.js`; all four files reported no errors.
+- Ran `npm test`; 7 tests passed, 0 failed.
+- Confirmed the Express router registers `POST /forgot-password` after loading `routes/auth.js` with a temporary `FIREBASE_DATABASE_URL` override in the shell.
+- The route is ready to send reset links in production and returns the generated link in development when SMTP is not configured.
+
+## Fix 20: Gmail EAUTH Fallback
+Status: Done
+
+What changed:
+- Hardened the notification service so a Gmail `EAUTH` / `534-5.7.9` failure disables email delivery for the current process instead of repeatedly surfacing the same auth error.
+- Kept the forgot-password flow usable in development by returning the generated reset link even when SMTP delivery fails.
+
+Validation:
+- Mocked `nodemailer.createTransport()` to throw a Gmail-style `EAUTH` / `534` error.
+- Confirmed `notificationService.sendEmail(...)` returned `false` and flipped `isEmailConfigured()` from `true` to `false` after the failure.
+- The validation run printed the expected warning: `SMTP authentication failed. Gmail requires an app-specific password. Email delivery has been disabled for this process.`
+- Re-ran `npm test`; 7 tests passed, 0 failed.
+
+## Fix 21: Orders Status Update Assigned Driver Guard
+Status: Done
+
+What changed:
+- Updated the order status route so it only writes `assignedDriver` when a defined value exists.
+- Prevented Firebase Realtime Database from rejecting status updates when an order has no assigned driver yet.
+
+Validation:
+- Replayed the `PATCH /api/orders/:id/status` handler with a mocked order that had no `assignedDriver` field.
+- Confirmed the captured RTDB update payload only contained `status`, `updatedBy`, and `updatedAt`.
+- Confirmed the handler returned `200` with `Order status updated successfully`.
+
+## Fix 22: Dashboard Revenue Uses Completed Orders Only
+Status: Done
+
+What changed:
+- Updated the dashboard stats route so total revenue is summed only from completed orders.
+- Treated `delivered` and legacy `completed` as completion states so older data still contributes correctly.
+
+Validation:
+- Ran `get_errors` on [routes/dashboard.js](routes/dashboard.js); no syntax errors were reported.
+- Executed the dashboard stats handler with mixed order statuses: pending, processing, delivered, completed, and cancelled.
+- Confirmed revenue only included the completed orders and returned `70` for the mixed sample (`30` delivered + `40` completed).
+
+## Fix 23: Notifications API Client Wiring
+Status: Done
+
+What changed:
+- Added a `notifications` client to [public/js/api-client.js](public/js/api-client.js) so the SPA can call the existing backend notifications route.
+- Exposed list, unread count, mark read, mark all read, delete, test notification, and settings endpoints through one centralized client surface.
+- Added a `readAll` alias so either frontend naming convention maps to the same `PATCH /notifications/mark-all-read` route.
+
+Validation:
+- Ran `get_errors` on [public/js/api-client.js](public/js/api-client.js); no errors were reported.
+- Ran `npm test`; 7 tests passed, 0 failed.
+
+## Fix 24: Browser Pass, Auth Check, and Content Sweep
+Status: Done
+
+What changed:
+- Ran a fresh browser pass on the live app from the login page through the authenticated routes.
+- Verified station_staff access on Dashboard, Orders, Inventory, and Profile, and confirmed Staff, Reports, and Deliveries redirect back to Dashboard for that role.
+- Verified driver access on Deliveries and Profile, and confirmed Orders and Inventory return `Insufficient permissions` through the API for that role.
+- Created a new inventory product and two test orders from the browser, then fetched the updated tables back through the SPA and API client.
+- Confirmed the driver workflow transitions the assigned delivery from `pending` to `in_transit` and then removes it from the active deliveries list after `delivered`.
+
+Validation:
+- Logged in as station_staff `zech@gmail.com` with the shared temp password and confirmed the dashboard rendered real stats.
+- Created product `Browser Water 428` and confirmed it appeared in the Inventory table.
+- Created order `Browser Customer 428` and confirmed it appeared in the Orders table.
+- Created order `Browser Driver Order 428` with the driver auth UID, confirmed it appeared in Orders, and confirmed it showed up in Deliveries for `chan@gmail.com`.
+- From the driver session, `apiClient.deliveries.getAll()` returned the active delivery list, while `apiClient.orders.getAll()` and `apiClient.inventory.getAll()` both returned `Insufficient permissions`.
+- Marked the delivery `in_transit` and then `delivered`, after which the Deliveries page returned `No active deliveries assigned.`

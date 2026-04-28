@@ -53,9 +53,36 @@ function getInventoryUnit(item) {
 
 function buildDriverNameMap(drivers = []) {
     return drivers.reduce((map, driver) => {
-        map[driver.id] = driver.name || driver.displayName || driver.email || driver.id;
+        const driverName = driver.name || driver.displayName || driver.email || driver.id;
+
+        if (driver.id) {
+            map[driver.id] = driverName;
+        }
+
+        if (driver.uid) {
+            map[driver.uid] = driverName;
+        }
+
         return map;
     }, {});
+}
+
+function getDriverAssignmentValue(driver) {
+    return driver.uid || driver.id || '';
+}
+
+function resolveDriverSelectionValue(selectedDriverId, drivers = []) {
+    if (!selectedDriverId) {
+        return '';
+    }
+
+    const directMatch = drivers.find((driver) => getDriverAssignmentValue(driver) === selectedDriverId);
+    if (directMatch) {
+        return getDriverAssignmentValue(directMatch);
+    }
+
+    const legacyMatch = drivers.find((driver) => driver.id === selectedDriverId || driver.uid === selectedDriverId);
+    return legacyMatch ? getDriverAssignmentValue(legacyMatch) : selectedDriverId;
 }
 
 async function loadDriverDirectory() {
@@ -125,6 +152,7 @@ async function loadOrders() {
 async function openOrderModal(orderId = null) {
     // Get inventory from cache
     let inventory = JSON.parse(localStorage.getItem('inventory') || '[]');
+    let selectedDriverValue = '';
 
     // Create modal HTML
     let modalHtml = `
@@ -236,7 +264,7 @@ async function openOrderModal(orderId = null) {
             document.getElementById('order-customer-id').value = order.customerId || '';
             document.getElementById('order-total-amount').value = order.totalAmount;
             document.getElementById('order-status').value = order.status;
-            document.getElementById('order-assigned-driver').value = order.assignedDriver || '';
+            selectedDriverValue = order.assignedDriver || '';
             document.getElementById('order-modal-title').textContent = 'Edit Order';
 
             // Load existing items if available
@@ -253,7 +281,7 @@ async function openOrderModal(orderId = null) {
         }
     }
 
-    await loadDriverOptions(orderId);
+    await loadDriverOptions(selectedDriverValue);
 
     modal.show();
 
@@ -328,12 +356,13 @@ async function loadDriverOptions(selectedDriverId = '') {
 
         const options = ['<option value="">Select a driver</option>'];
         drivers.forEach((driver) => {
-            options.push(`<option value="${driver.id}">${driver.name || driver.email || driver.id}</option>`);
+            const optionValue = getDriverAssignmentValue(driver);
+            options.push(`<option value="${optionValue}">${driver.name || driver.email || driver.id}</option>`);
         });
 
         select.innerHTML = options.join('');
         select.disabled = false;
-        select.value = selectedDriverId || '';
+        select.value = resolveDriverSelectionValue(selectedDriverId, drivers);
     } catch (error) {
         console.error('Error loading drivers:', error);
         select.innerHTML = '<option value="">Unable to load drivers</option>';

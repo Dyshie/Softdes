@@ -35,6 +35,31 @@ function getProductQuantity(product) {
     return Number(product.stock?.current || 0);
 }
 
+function coerceNumber(value, fallback) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function getLowStockThreshold(product) {
+    if (typeof product.lowStockThreshold !== 'undefined') {
+        return coerceNumber(product.lowStockThreshold, 10);
+    }
+
+    if (typeof product.stock?.reorderLevel !== 'undefined') {
+        return coerceNumber(product.stock.reorderLevel, 10);
+    }
+
+    return 10;
+}
+
+function getReorderQuantity(product) {
+    if (typeof product.stock?.reorderQuantity !== 'undefined') {
+        return coerceNumber(product.stock.reorderQuantity, 50);
+    }
+
+    return 50;
+}
+
 /**
  * Load and display inventory
  */
@@ -52,7 +77,8 @@ async function loadInventory() {
         products.forEach(product => {
             const price = getProductPrice(product);
             const quantity = getProductQuantity(product);
-            const statusBadge = quantity < 10 ? '<span class="badge bg-warning text-dark">Low Stock</span>' : '<span class="badge bg-success">In Stock</span>';
+            const threshold = getLowStockThreshold(product);
+            const statusBadge = quantity <= threshold ? '<span class="badge bg-warning text-dark">Low Stock</span>' : '<span class="badge bg-success">In Stock</span>';
             
             html += `<tr>
                 <td>${product.name}</td>
@@ -105,6 +131,14 @@ async function openInventoryModal(productId = null) {
                                 <input type="number" class="form-control" id="product-quantity" required>
                             </div>
                             <div class="mb-3">
+                                <label for="product-low-stock-threshold" class="form-label">Low Stock Threshold</label>
+                                <input type="number" class="form-control" id="product-low-stock-threshold" min="0" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="product-reorder-quantity" class="form-label">Reorder Quantity</label>
+                                <input type="number" class="form-control" id="product-reorder-quantity" min="1" required>
+                            </div>
+                            <div class="mb-3">
                                 <label for="product-unit" class="form-label">Unit</label>
                                 <select class="form-select" id="product-unit" required>
                                     <option value="piece" selected>Piece</option>
@@ -136,11 +170,16 @@ async function openInventoryModal(productId = null) {
             document.getElementById('product-name').value = product.name;
             document.getElementById('product-price').value = getProductPrice(product);
             document.getElementById('product-quantity').value = getProductQuantity(product);
+            document.getElementById('product-low-stock-threshold').value = getLowStockThreshold(product);
+            document.getElementById('product-reorder-quantity').value = getReorderQuantity(product);
             document.getElementById('product-unit').value = product.unit || 'piece';
             document.getElementById('inventory-modal-title').textContent = 'Edit Product';
         } catch (error) {
             console.error('Error loading product:', error);
         }
+    } else {
+        document.getElementById('product-low-stock-threshold').value = 10;
+        document.getElementById('product-reorder-quantity').value = 50;
     }
 
     modal.show();
@@ -158,11 +197,16 @@ async function saveInventory() {
         const productId = document.getElementById('product-id').value;
         const price = parseFloat(document.getElementById('product-price').value);
         const quantity = parseInt(document.getElementById('product-quantity').value);
+        const lowStockThresholdValue = parseInt(document.getElementById('product-low-stock-threshold').value, 10);
+        const reorderQuantityValue = parseInt(document.getElementById('product-reorder-quantity').value, 10);
+        const lowStockThreshold = Number.isFinite(lowStockThresholdValue) ? lowStockThresholdValue : 10;
+        const reorderQuantity = Number.isFinite(reorderQuantityValue) ? reorderQuantityValue : 50;
 
         const data = {
             name: document.getElementById('product-name').value,
             price,
             quantity,
+            lowStockThreshold,
             pricing: {
                 costPrice: price,
                 sellingPrice: price,
@@ -172,8 +216,8 @@ async function saveInventory() {
                 current: quantity,
                 reserved: 0,
                 available: quantity,
-                reorderLevel: 10,
-                reorderQuantity: 50
+                reorderLevel: lowStockThreshold,
+                reorderQuantity
             },
             unit: document.getElementById('product-unit').value.trim().toLowerCase()
         };

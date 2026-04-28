@@ -29,15 +29,33 @@ const transporter = nodemailer.createTransport(emailConfig);
 class NotificationService {
     constructor() {
         this.templates = emailTemplates;
+        this.smtpAuthFailed = false;
+    }
+
+    getRuntimeStatus() {
+        const smtpConfigured = !!(getSmtpUser() && getSmtpPass());
+
+        return {
+            smtpConfigured,
+            smtpHealthy: smtpConfigured && !this.smtpAuthFailed,
+            smtpAuthFailed: this.smtpAuthFailed,
+            host: getSmtpHost(),
+            port: getSmtpPort(),
+            from: process.env.SMTP_FROM || process.env.EMAIL_FROM || getSmtpUser() || null
+        };
     }
 
     isEmailConfigured() {
-        return !!(getSmtpUser() && getSmtpPass());
+        return !this.smtpAuthFailed && !!(getSmtpUser() && getSmtpPass());
     }
 
     // Send email notification
     async sendEmail(to, templateName, data) {
         try {
+            if (this.smtpAuthFailed) {
+                return false;
+            }
+
             if (!this.isEmailConfigured()) {
                 if (process.env.NODE_ENV === 'production') {
                     console.warn('SMTP credentials not configured, skipping email send');
@@ -86,6 +104,12 @@ class NotificationService {
             console.log('Email sent successfully:', info.messageId);
             return true;
         } catch (error) {
+            if (error?.code === 'EAUTH' || error?.responseCode === 534) {
+                this.smtpAuthFailed = true;
+                console.warn('SMTP authentication failed. Gmail requires an app-specific password. Email delivery has been disabled for this process.');
+                return false;
+            }
+
             console.error('Error sending email:', error);
             return false;
         }
